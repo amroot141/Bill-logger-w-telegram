@@ -18,3 +18,13 @@ th, td { padding: 10px; border-bottom: 1px solid #ddd; }
 .summary-item span:first-child { display: block; font-weight: bold; }
 .payment-summary { position: fixed; top: 20px; right: 20px; width: 200px; }
 .summary-row { display: flex; justify-content: space-between; margin: 8px 0; }
+.bill-controls {
+  margin: 20px 0;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+.bill-controls button {
+  margin-right: 10px;
+  padding: 5px 10px;
+}
