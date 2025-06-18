@@ -14,83 +14,14 @@ document.addEventListener('DOMContentLoaded', function () {
   const currentTimeEl = document.getElementById('currentTime');
   const scriptURL = "https://script.google.com/macros/s/AKfycbwyPj3iGRxUYCiRfOoKRzQhxeTbUxIkngr7QnPRCeWCd03I0wyLDhEQKn1hKP4WX-QeeA/exec";
 
-   // Enhanced bill storage with Telegram tracking
   let bills = JSON.parse(localStorage.getItem('bills')) || [];
 
-  // Generate unique bill ID
-  function generateBillId() {
-    return Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+  function updateClock() {
+    const now = new Date();
+    currentTimeEl.textContent = now.toLocaleString();
   }
-
-  // Create bill hash for duplicate detection
-  function createBillHash(bill) {
-    return `${bill.name}-${bill.amount}-${bill.payment}`.toLowerCase().replace(/\s+/g, '');
-  }
-
-  // Modified addBill function
- function addBill() {
-  const name = customerNameInput.value.trim();
-  const amount = parseFloat(amountInput.value);
-  const payment = paymentModeInput.value;
-
-  if (!name || isNaN(amount)) {
-    alert('Please enter valid item name and amount.');
-    return;
-  }
-
-  const newBill = {
-    id: Date.now() + '-' + Math.random().toString(36).substr(2, 8),
-    name,
-    amount,
-    payment,
-    time: new Date().toISOString(),
-    isSent: false,
-    sendAttempts: 0,
-    isProcessing: false // New flag for UI
-  };
-
-  bills.push(newBill);
-  saveToStorage();
-  renderTable();
-  
-  // Clear inputs
-  customerNameInput.value = '';
-  amountInput.value = '';
-  
-  // Immediately attempt to send
-  processUnsentBills();
-}
-
-// Update renderTable to show processing status:
-function renderTable() {
-  billsTableBody.innerHTML = '';
-  
-  bills.forEach((bill, index) => {
-    const tr = document.createElement('tr');
-    let status = '';
-    
-    if (bill.isSent) {
-      status = '✓ Sent';
-    } else if (pendingSends.has(bill.id)) {
-      status = '🔄 Sending...';
-    } else {
-      status = 'Pending';
-    }
-    
-    tr.innerHTML = `
-      <td>${bill.name}</td>
-      <td>₹${bill.amount.toFixed(2)}</td>
-      <td>${bill.payment}</td>
-      <td>${new Date(bill.time).toLocaleTimeString()}</td>
-      <td class="status">${status}</td>
-      <td>
-        <button onclick="editBill(${index})">Edit</button>
-        <button onclick="deleteBill(${index})">Delete</button>
-      </td>
-    `;
-    billsTableBody.appendChild(tr);
-  });
-  
+  setInterval(updateClock, 1000);
+  updateClock();
 
   function saveToStorage() {
     localStorage.setItem('bills', JSON.stringify(bills));
@@ -197,3 +128,4 @@ function renderTable() {
 
   renderTable();
 });
+
