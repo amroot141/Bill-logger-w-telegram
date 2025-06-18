@@ -37,6 +37,12 @@
       <div class="summary-item"><span>Total Bills</span><span id="billsCount">0</span></div>
       <div class="summary-item"><span>Total Amount</span><span id="totalAmount">₹0</span></div>
     </div>
+    <!-- Add somewhere in your index.html -->
+<div class="bill-controls">
+  <button onclick="sendUnsentBills()">Send Pending Bills Now</button>
+  <button onclick="clearInterval(sendingInterval)">Stop Auto-Sending</button>
+  <span id="send-status"></span>
+</div>
     <div class="payment-summary">
       <h3>Payment Summary</h3>
       <div class="summary-row"><span>Cash</span><span id="cashTotal">₹0</span></div>
