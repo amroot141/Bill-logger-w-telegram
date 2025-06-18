@@ -1,72 +1,34 @@
-// assets/js/telegram_pusher.js
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST requests are allowed.' });
+  }
 
-// Get only unsent bills
-function getUnsentBills() {
-  const allBills = JSON.parse(localStorage.getItem('bills')) || [];
-  return allBills.filter(bill => !bill.isSent);
-}
+  // Telegram Bot Config
+  const token = '8122527070:AAHTI-OWa8VIyPUFGFmuSN6_JE24cnLhN9U';
+  const chatId = '5154326503';
 
-// Mark a bill as sent in localStorage
-function markBillAsSent(billId) {
-  const bills = JSON.parse(localStorage.getItem('bills')) || [];
-  const updatedBills = bills.map(bill => {
-    if (bill.id === billId) {
-      return { ...bill, isSent: true, sentAt: new Date().toISOString() };
-    }
-    return bill;
-  });
-  localStorage.setItem('bills', JSON.stringify(updatedBills));
-}
+  // Support both single bill & full summary
+  const { text, name, amount, payment, time } = req.body;
 
-async function sendBillViaVercelAPI(bill) {
+  // Build the message content
+  const message = text || `🧾 *Bill Alert*\nItem: ${name}\nAmount: ₹${amount}\nMode: ${payment}\nTime: ${time}`;
+
   try {
-    const response = await fetch('/api/send.js', {
+    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bill)
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown'
+      })
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    const data = await tgRes.json();
+    if (!data.ok) throw new Error(data.description);
 
-    const result = await response.json();
-    console.log('Telegram message sent:', bill.id);
-    return result;
+    res.status(200).json({ ok: true, message: 'Telegram message sent successfully.' });
   } catch (err) {
-    console.error('Failed to send bill:', bill.id, err);
-    throw err; // Re-throw to handle in calling function
+    res.status(500).json({ error: 'Failed to send message: ' + err.message });
   }
 }
-
-async function sendUnsentBillsToTelegram() {
-  const unsentBills = getUnsentBills();
-  
-  if (unsentBills.length === 0) {
-    console.log('No unsent bills found');
-    return;
-  }
-
-  console.log(`Sending ${unsentBills.length} unsent bills`);
-
-  for (const bill of unsentBills) {
-    try {
-      await sendBillViaVercelAPI(bill);
-      markBillAsSent(bill.id); // Only mark as sent if successful
-    } catch (error) {
-      console.error('Error processing bill:', bill.id, error);
-      // Consider adding retry logic here
-    }
-  }
-}
-
-// Send every 5 minutes
-const interval = setInterval(sendUnsentBillsToTelegram, 5 * 60 * 1000);
-
-// Also run once at page load
-document.addEventListener('DOMContentLoaded', () => {
-  sendUnsentBillsToTelegram();
-});
-
-// For debugging
-window.clearBillInterval = () => clearInterval(interval);
