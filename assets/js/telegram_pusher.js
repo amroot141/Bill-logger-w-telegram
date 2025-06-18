@@ -62,28 +62,55 @@ async function sendBillViaVercelAPI(bill) {
 }
 
 async function sendUnsentBillsToTelegram() {
-  const unsentBills = getUnsentBills();
-  
-  if (unsentBills.length === 0) {
-    console.log('No unsent bills found');
+  const bills = JSON.parse(localStorage.getItem('bills')) || [];
+  if (bills.length === 0) {
+    console.log('No bills to send');
     return;
   }
 
-  console.log(`Sending ${unsentBills.length} unsent bills`);
+  // Generate summary
+  let summary = "🧾 *Bill Summary*\n";
+  let cash = 0, online = 0, total = 0;
 
-  for (const bill of unsentBills) {
-    try {
-      await sendBillViaVercelAPI(bill);
-      markBillAsSent(bill.id); // Only mark as sent if successful
-    } catch (error) {
-      console.error('Error processing bill:', bill.id, error);
-      // Consider adding retry logic here
+  bills.forEach((bill, index) => {
+    const { name, amount, payment, time } = bill;
+    summary += `${index + 1}. ${name} - ₹${amount} (${payment}) @ ${time}\n`;
+    total += parseFloat(amount);
+    if (payment === "cash") cash += parseFloat(amount);
+    else online += parseFloat(amount);
+  });
+
+  summary += `\n💵 Cash: ₹${cash.toFixed(2)}\n💳 Online: ₹${online.toFixed(2)}\n📊 Total: ₹${total.toFixed(2)}\n🕒 ${new Date().toLocaleString()}`;
+
+  try {
+    const res = await fetch('/api/send.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: summary })
+    });
+
+    const result = await res.json();
+    if (result.ok) {
+      console.log('Telegram summary sent!');
+    } else {
+      console.error('Telegram error:', result);
     }
+  } catch (err) {
+    console.error('Failed to send Telegram summary:', err.message);
   }
 }
 
-// Send every 5 minutes
-const interval = setInterval(sendUnsentBillsToTelegram, 5 * 60 * 1000);
+// Only send summary if time is exactly 10:30 PM
+function isTimeToSend() {
+  const now = new Date();
+  return now.getHours() === 22 && now.getMinutes() === 30;
+}
+
+setInterval(() => {
+  if (isTimeToSend()) {
+    sendUnsentBillsToTelegram();
+  }
+}, 60 * 1000); // check every 1 minute
 
 // Also run once at page load
 document.addEventListener('DOMContentLoaded', () => {
