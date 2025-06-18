@@ -1,0 +1,50 @@
+
+<!DOCTYPE html>
+<html>
+<head><title>Telegram Receiver Logger</title></head>
+<body>
+  <h2>Received Bills</h2>
+  <button onclick="downloadCSV()">Download CSV</button>
+  <script>
+    const TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN';
+    const CHAT_ID = YOUR_CHAT_ID;
+
+    async function fetchMessages() {
+      const res = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates`);
+      const data = await res.json();
+      const messages = data.result || [];
+
+      const seen = JSON.parse(localStorage.getItem('logged_pushes') || '[]');
+      const csvSet = new Set((localStorage.getItem('csv_lines') || 'Customer,Amount,Time\n').split('\n'));
+
+      messages.forEach(msg => {
+        const text = msg.message?.text || '';
+        const match = text.match(/Item: (.+)\nAmount: ₹(\d+)\nTime: (.+)/);
+        if (match) {
+          const [_, customer, amount, time] = match;
+          const isDup = seen.some(e => e.time === time && e.amount === amount);
+          if (!isDup) {
+            seen.push({ customer, amount, time });
+            csvSet.add(`${customer},${amount},${time}`);
+          }
+        }
+      });
+
+      localStorage.setItem('logged_pushes', JSON.stringify(seen));
+      localStorage.setItem('csv_lines', Array.from(csvSet).join('\n'));
+    }
+
+    setInterval(fetchMessages, 60 * 1000);
+    fetchMessages();
+
+    function downloadCSV() {
+      const csv = localStorage.getItem('csv_lines') || 'Customer,Amount,Time\n';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'telegram_bills.csv';
+      a.click();
+    }
+  </script>
+</body>
+</html>
