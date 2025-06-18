@@ -15,7 +15,31 @@ document.addEventListener('DOMContentLoaded', function () {
   const scriptURL = "https://script.google.com/macros/s/AKfycbwyPj3iGRxUYCiRfOoKRzQhxeTbUxIkngr7QnPRCeWCd03I0wyLDhEQKn1hKP4WX-QeeA/exec";
 
   let bills = JSON.parse(localStorage.getItem('bills')) || [];
+  function addBill() {
+    const name = customerNameInput.value.trim();
+    const amount = parseFloat(amountInput.value);
+    const payment = paymentModeInput.value;
 
+    if (!name || isNaN(amount)) return;
+
+    const newBill = {
+      id: Date.now(), // Critical for tracking
+      name,
+      amount,
+      payment,
+      time: new Date().toLocaleTimeString(),
+      isSent: false, // Initialize as unsent
+      sendAttempts: 0
+    };
+
+    bills.push(newBill);
+    saveToStorage();
+    renderTable();
+    
+    // Clear inputs
+    customerNameInput.value = '';
+    amountInput.value = '';
+  }
   function updateClock() {
     const now = new Date();
     currentTimeEl.textContent = now.toLocaleString();
