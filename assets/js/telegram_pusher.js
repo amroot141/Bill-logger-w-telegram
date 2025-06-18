@@ -6,7 +6,7 @@ function getUnsentBills() {
 
 async function sendBillViaVercelAPI(bill) {
   try {
-    const response = await fetch('/api/send.js', {
+    const response = await fetch('send.js', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bill)
