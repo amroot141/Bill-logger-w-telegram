@@ -32,7 +32,7 @@ async function sendUnsentBillsToTelegram() {
 }
 
 // Send every 5 minutes
-setInterval(sendUnsentBillsToTelegram, 5 * 60 * 1000);
+setInterval(sendUnsentBillsToTelegram, 10 * 1000);
 
 // Also run once at page load
 sendUnsentBillsToTelegram();
