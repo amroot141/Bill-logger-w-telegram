@@ -6,8 +6,8 @@
   <h2>Received Bills</h2>
   <button onclick="downloadCSV()">Download CSV</button>
   <script>
-    const TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN';
-    const CHAT_ID = YOUR_CHAT_ID;
+    const TOKEN = '8122527070:AAHTI-OWa8VIyPUFGFmuSN6_JE24cnLhN9U';
+    const CHAT_ID = 5154326503;
 
     async function fetchMessages() {
       const res = await fetch(`https://api.telegram.org/bot${TOKEN}/getUpdates`);
@@ -34,7 +34,7 @@
       localStorage.setItem('csv_lines', Array.from(csvSet).join('\n'));
     }
 
-    setInterval(fetchMessages, 60 * 1000);
+    setInterval(fetchMessages, 10 * 1000);
     fetchMessages();
 
     function downloadCSV() {
