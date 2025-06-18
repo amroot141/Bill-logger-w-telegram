@@ -23,4 +23,4 @@ function sendUnsentBillsToTelegram() {
   localStorage.setItem('sent_bills', JSON.stringify(sent));
 }
 
-setInterval(sendUnsentBillsToTelegram, 10 * 1000);
+setInterval(sendUnsentBillsToTelegram, 5* 10 * 1000);
