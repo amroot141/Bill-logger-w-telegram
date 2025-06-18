@@ -1,98 +1,87 @@
-// assets/js/telegram_pusher.js
+// Configuration
+const BILLS_KEY = 'bills';
+const SEND_DELAY_MS = 500;
+const MAX_ATTEMPTS = 3;
 
-// ======================
-// Core Functions
-// ======================
+// Main processing function
+async function processUnsentBills() {
+  const bills = JSON.parse(localStorage.getItem(BILLS_KEY)) || [];
+  const sentHashes = new Set();
 
-function getAllBills() {
-  return JSON.parse(localStorage.getItem('bills')) || [];
+  // Get all hashes of already sent bills
+  bills.forEach(bill => {
+    if (bill.isSent) sentHashes.add(bill.hash);
+  });
+
+  // Process unsent bills
+  for (const bill of bills) {
+    if (!bill.isSent && 
+        (bill.sendAttempts || 0) < MAX_ATTEMPTS && 
+        !sentHashes.has(bill.hash)) {
+          
+      try {
+        await sendBillToTelegram(bill);
+        updateBillStatus(bill.id, {
+          isSent: true,
+          sentAt: new Date().toISOString(),
+          sendAttempts: (bill.sendAttempts || 0) + 1
+        });
+        sentHashes.add(bill.hash);
+      } catch (error) {
+        console.error(`Failed to send bill ${bill.id}:`, error);
+        updateBillStatus(bill.id, {
+          sendAttempts: (bill.sendAttempts || 0) + 1
+        });
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS));
+    }
+  }
 }
 
-function getUnsentBills() {
-  const allBills = getAllBills();
-  return allBills.filter(bill => 
-    !bill.isSent && 
-    (bill.sendAttempts || 0) < 3 // Max 3 attempts
-  );
+// Telegram API communication
+async function sendBillToTelegram(bill) {
+  const response = await fetch('/api/send.js', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: bill.name,
+      amount: bill.amount,
+      payment: bill.payment,
+      time: bill.time
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return await response.json();
 }
 
-function updateBill(billId, updates) {
-  const bills = getAllBills();
+// Update bill in storage
+function updateBillStatus(billId, updates) {
+  const bills = JSON.parse(localStorage.getItem(BILLS_KEY)) || [];
   const updatedBills = bills.map(bill => 
     bill.id === billId ? { ...bill, ...updates } : bill
   );
-  localStorage.setItem('bills', JSON.stringify(updatedBills));
+  localStorage.setItem(BILLS_KEY, JSON.stringify(updatedBills));
 }
 
-// ======================
-// Telegram Integration
-// ======================
+// Cleanup old bills (runs daily)
+function cleanupOldBills() {
+  const bills = JSON.parse(localStorage.getItem(BILLS_KEY)) || [];
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-async function sendSingleBill(bill) {
-  try {
-    console.log(`Attempting to send bill ${bill.id}`);
-    
-    const response = await fetch('/api/send.js', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bill)
-    });
+  const filteredBills = bills.filter(bill => {
+    const billDate = new Date(bill.time || bill.sentAt);
+    return billDate > oneWeekAgo;
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    // Mark as sent only after successful delivery
-    updateBill(bill.id, {
-      isSent: true,
-      sentAt: new Date().toISOString(),
-      sendAttempts: (bill.sendAttempts || 0) + 1
-    });
-
-    console.log(`Successfully sent bill ${bill.id}`);
-    return true;
-  } catch (error) {
-    // Increment attempt counter
-    updateBill(bill.id, {
-      sendAttempts: (bill.sendAttempts || 0) + 1
-    });
-    
-    console.error(`Failed to send bill ${bill.id}:`, error);
-    return false;
-  }
+  localStorage.setItem(BILLS_KEY, JSON.stringify(filteredBills));
 }
 
-// ======================
-// Main Controller
-// ======================
-
-async function sendUnsentBills() {
-  const unsentBills = getUnsentBills();
-  
-  if (unsentBills.length === 0) {
-    console.log('No bills to send');
-    return;
-  }
-
-  console.log(`Found ${unsentBills.length} unsent bills`);
-  
-  for (const bill of unsentBills) {
-    await sendSingleBill(bill);
-    // Small delay between sends to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-}
-
-// ======================
-// Initialization
-// ======================
-
-// Start sending every 5 minutes
-const sendingInterval = setInterval(sendUnsentBills, 5 * 60 * 1000);
-
-// Run immediately on page load
-document.addEventListener('DOMContentLoaded', () => {
-  sendUnsentBills();
-});
-
-// For debugging: window.stopSending = () => clearInterval(sendingInterval);
+// Initialize
+setInterval(processUnsentBills, 5 * 60 * 1000); // Check every 5 minutes
+setInterval(cleanupOldBills, 24 * 60 * 60 * 1000); // Cleanup daily
+document.addEventListener('DOMContentLoaded', processUnsentBills);
