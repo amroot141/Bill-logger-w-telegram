@@ -3,38 +3,54 @@ const BILLS_KEY = 'bills';
 const SEND_DELAY_MS = 500;
 const MAX_ATTEMPTS = 3;
 
-// Main processing function
+// Atomic bill locking mechanism
+const pendingSends = new Set();
+
 async function processUnsentBills() {
   const bills = JSON.parse(localStorage.getItem(BILLS_KEY)) || [];
-  const sentHashes = new Set();
+  const now = new Date();
 
-  // Get all hashes of already sent bills
-  bills.forEach(bill => {
-    if (bill.isSent) sentHashes.add(bill.hash);
-  });
-
-  // Process unsent bills
   for (const bill of bills) {
-    if (!bill.isSent && 
-        (bill.sendAttempts || 0) < MAX_ATTEMPTS && 
-        !sentHashes.has(bill.hash)) {
-          
-      try {
-        await sendBillToTelegram(bill);
-        updateBillStatus(bill.id, {
-          isSent: true,
-          sentAt: new Date().toISOString(),
-          sendAttempts: (bill.sendAttempts || 0) + 1
-        });
-        sentHashes.add(bill.hash);
-      } catch (error) {
-        console.error(`Failed to send bill ${bill.id}:`, error);
-        updateBillStatus(bill.id, {
-          sendAttempts: (bill.sendAttempts || 0) + 1
-        });
-      }
+    // Skip if: already sent, exceeded attempts, or currently being sent
+    if (bill.isSent || 
+        (bill.sendAttempts || 0) >= MAX_ATTEMPTS ||
+        pendingSends.has(bill.id)) {
+      continue;
+    }
+
+    // Lock this bill for processing
+    pendingSends.add(bill.id);
+    
+    try {
+      console.log(`Attempting to send bill ${bill.id}`);
+      await sendBillToTelegram(bill);
       
-      await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS));
+      // Only mark as sent after successful delivery
+      const updatedBills = JSON.parse(localStorage.getItem(BILLS_KEY)).map(b => 
+        b.id === bill.id ? { 
+          ...b, 
+          isSent: true,
+          sentAt: now.toISOString(),
+          sendAttempts: (b.sendAttempts || 0) + 1
+        } : b
+      );
+      
+      localStorage.setItem(BILLS_KEY, JSON.stringify(updatedBills));
+      console.log(`Successfully sent bill ${bill.id}`);
+    } catch (error) {
+      console.error(`Failed to send bill ${bill.id}:`, error);
+      // Update attempt count but keep as unsent
+      const updatedBills = JSON.parse(localStorage.getItem(BILLS_KEY)).map(b => 
+        b.id === bill.id ? { 
+          ...b, 
+          sendAttempts: (b.sendAttempts || 0) + 1 
+        } : b
+      );
+      localStorage.setItem(BILLS_KEY, JSON.stringify(updatedBills));
+    } finally {
+      // Release lock
+      pendingSends.delete(bill.id);
+      await new Promise(resolve => setTimeout(resolve, SEND_DELAY));
     }
   }
 }
